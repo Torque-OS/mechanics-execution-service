@@ -21,6 +21,7 @@ public sealed class ExecutionApiFactory : WebApplicationFactory<Program>
 
     public InMemoryExecutionQueue Queue { get; } = new();
     public InMemoryExecutionNotes Notes { get; } = new();
+    public RecordingExecutionEventPublisher Events { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -40,6 +41,9 @@ public sealed class ExecutionApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<IExecutionNotes>();
             services.AddSingleton<IExecutionNotes>(Notes);
+
+            services.RemoveAll<IExecutionEventPublisher>();
+            services.AddSingleton<IExecutionEventPublisher>(Events);
 
             // No broker or PostgreSQL here: drop MassTransit's bus and outbox-delivery hosted services.
             // The consumer itself is covered by EnqueueExecutionConsumerTests (test harness).

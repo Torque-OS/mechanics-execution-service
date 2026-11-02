@@ -62,6 +62,7 @@ public static class DependencyInjection
         services.AddSingleton(sp => sp.GetRequiredService<IMongoClient>().GetDatabase(mongoUrl.DatabaseName ?? "execution"));
         services.AddScoped<IExecutionQueue, MongoExecutionQueue>();
         services.AddScoped<IExecutionNotes, MongoExecutionNotes>();
+        services.AddScoped<IExecutionEventPublisher, MassTransitExecutionEventPublisher>();
 
         return services;
     }

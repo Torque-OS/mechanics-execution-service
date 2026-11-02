@@ -15,6 +15,8 @@ public static class DependencyInjection
         services.AddScoped<StartDiagnosisHandler>();
         services.AddScoped<AddExecutionNoteHandler>();
         services.AddScoped<GetExecutionNotesHandler>();
+        services.AddScoped<CompleteExecutionHandler>();
+        services.AddScoped<FailExecutionHandler>();
 
         return services;
     }

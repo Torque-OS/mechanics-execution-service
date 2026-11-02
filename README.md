@@ -7,9 +7,9 @@ Execution Service — one of the three microservices of the [Mechanics Software]
 Per [ADR-010](https://github.com/Torque-OS/mechanics-software/blob/main/docs/decisions/ADR-010-microservices-split.md):
 
 - Manage the execution queue for service orders once payment is confirmed.
-- Track diagnosis and repair status (F4-19).
-- React to the `EnqueueExecution` command (**done, F4-18**) and publish `ExecutionCompleted`/`ExecutionFailed`
-  events (F4-20) to the OS Service's Saga orchestrator ([ADR-011](https://github.com/Torque-OS/mechanics-software/blob/main/docs/decisions/ADR-011-saga-orquestrada-e-mensageria.md)).
+- Track diagnosis and repair status.
+- React to the `EnqueueExecution` command and publish `ExecutionCompleted`/`ExecutionFailed` events to the OS
+  Service's Saga orchestrator ([ADR-011](https://github.com/Torque-OS/mechanics-software/blob/main/docs/decisions/ADR-011-saga-orquestrada-e-mensageria.md)).
 
 This repo owns its own data — **no other service may query this database directly**
 ([ADR-012](https://github.com/Torque-OS/mechanics-software/blob/main/docs/decisions/ADR-012-banco-por-servico.md)): PostgreSQL (`execution_orders`, system of record) and MongoDB (`execution_queue`, a read-optimized
@@ -24,8 +24,10 @@ projection of the queue — see [Persistence](#persistence)).
 - **Diagnosis/repair status (F4-19): done.** `POST /api/executions/{id}/start-diagnosis` moves
   the order to `IN_PROGRESS` and off the queue; `POST/GET /api/executions/{id}/notes` record and
   list diagnosis/repair notes in MongoDB.
-- Publishing `ExecutionCompleted`/`ExecutionFailed` and the compensation path are **F4-20 and
-  F4-21** — not implemented yet. See the [Fase 4 board](https://github.com/orgs/Torque-OS/projects/4).
+- **Completion/failure (F4-20): done.** `POST /api/executions/{id}/complete` and `.../fail`
+  publish `ExecutionCompleted`/`ExecutionFailed` — see [Saga messages](#saga-messages).
+- The compensation path is **F4-21** — not implemented yet. See the
+  [Fase 4 board](https://github.com/orgs/Torque-OS/projects/4).
 - No authentication on the API yet (unlike `mechanics-billing-service`, which requires a JWT on
   every controller) — the only endpoints today are read-only queue views. Add it alongside F4-19
   if staff-facing write actions are needed, or as its own issue.
@@ -68,18 +70,23 @@ Without Docker for the API: `docker compose up postgres mongo rabbitmq -d`, then
 | POST | `/api/executions/{id}/start-diagnosis` | `QUEUED` → `IN_PROGRESS`; removes the order from the queue |
 | POST | `/api/executions/{id}/notes` | Record a diagnosis/repair note (only while `IN_PROGRESS`) — body `{ "text": "..." }` |
 | GET | `/api/executions/{id}/notes` | Notes for an order, oldest first |
+| POST | `/api/executions/{id}/complete` | `IN_PROGRESS` → `COMPLETED`; publishes `ExecutionCompleted` |
+| POST | `/api/executions/{id}/fail` | `IN_PROGRESS` → `FAILED`; publishes `ExecutionFailed` — body `{ "reason": "..." }` |
 | GET | `/health` | Liveness/readiness probe |
 
 No authentication yet — see [Status](#status).
 
 ## Saga messages
 
-The Execution Service **consumes** this command (ADR-011) with MassTransit 8.5 over RabbitMQ, through the **EF Core
-transactional inbox**: a redelivery of the same `MessageId` is dropped before the handler runs.
+MassTransit 8.5 over RabbitMQ, with the EF Core transactional inbox/outbox (ADR-011): a redelivery of the same
+`MessageId` is dropped before a consumer runs, and a published event is stored with the state change and delivered
+only once `SaveChanges` commits.
 
-| Message | Direction | Payload |
+### Consumes
+
+| Message | From | Payload |
 |---|---|---|
-| `EnqueueExecution` | OS Service → Execution Service | `{ serviceOrderId: guid, priority: int = 0 }` |
+| `EnqueueExecution` | OS Service | `{ serviceOrderId: guid, priority: int = 0 }` |
 
 - Idempotent: re-sending `EnqueueExecution` for an already-queued `serviceOrderId` is a no-op (enforced by a unique
   index, not just the inbox).
@@ -93,15 +100,26 @@ transactional inbox**: a redelivery of the same `MessageId` is dropped before th
     "message": { "serviceOrderId": "<guid>", "priority": 0 } }
   ```
 
+### Publishes
+
+| Message | To | Payload |
+|---|---|---|
+| `ExecutionCompleted` | OS Service | `{ serviceOrderId, executionOrderId, completedAt }` |
+| `ExecutionFailed` | OS Service | `{ serviceOrderId, executionOrderId, reason, failedAt }` — triggers Saga compensation |
+
+Sent from `POST /api/executions/{id}/complete` / `.../fail` today (staff-driven); once F4-13/F4-22 wire the real
+Saga, these are the events the OS Service's orchestrator reacts to.
+
 **For the OS Service (F4-13/F4-22, the Saga orchestrator):**
 
-- Declare a record with exactly this namespace, name and fields — MassTransit identifies a message by
-  `urn:message:TorqueOS.Contracts.Execution:<Name>`. Copy it from
-  `src/MechanicsSoftware.ExecutionService.Application/Contracts/EnqueueExecution.cs`.
-- The message has its own fanout exchange named `TorqueOS.Contracts.Execution:EnqueueExecution`; this service's
-  consumer binds its queue to it automatically.
+- Declare records with exactly this namespace, name and fields — MassTransit identifies a message by
+  `urn:message:TorqueOS.Contracts.Execution:<Name>`. Copy them from
+  `src/MechanicsSoftware.ExecutionService.Application/Contracts/`.
+- Each message has its own fanout exchange named `TorqueOS.Contracts.Execution:<Name>`; this service's consumer (for
+  `EnqueueExecution`) binds its queue to it automatically.
 - `priority` is optional and currently unused by any real caller — every order queues at the same priority (plain
   FIFO by arrival) until the OS Service has a reason to set it.
+- `CorrelationId` on every published message is the `ServiceOrderId`.
 - Evolution: fields are only ever added. A breaking change gets a new type (e.g. `EnqueueExecutionV2`).
 
 ## Known infrastructure gap

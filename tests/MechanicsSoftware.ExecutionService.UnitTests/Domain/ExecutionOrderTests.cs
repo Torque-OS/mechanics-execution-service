@@ -76,4 +76,70 @@ public class ExecutionOrderTests
         var act = () => order.StartDiagnosis();
         act.Should().Throw<DomainException>();
     }
+
+    private static ExecutionOrder InProgressOrder()
+    {
+        var order = ExecutionOrder.Create(Guid.NewGuid());
+        order.StartDiagnosis();
+        return order;
+    }
+
+    [Fact]
+    public void Complete_FromInProgress_StatusIsCompleted()
+    {
+        var order = InProgressOrder();
+        order.Complete();
+        order.Status.Value.Should().Be(ExecutionStatus.Status.Completed);
+    }
+
+    [Fact]
+    public void Complete_FromInProgress_SetsFinishedAt()
+    {
+        var order = InProgressOrder();
+        var before = DateTime.UtcNow;
+        order.Complete();
+        order.FinishedAt.Should().NotBeNull();
+        order.FinishedAt.Should().BeOnOrAfter(before);
+    }
+
+    [Fact]
+    public void Complete_StillQueued_Throws()
+    {
+        var order = ExecutionOrder.Create(Guid.NewGuid());
+        var act = () => order.Complete();
+        act.Should().Throw<DomainException>();
+    }
+
+    [Fact]
+    public void Fail_FromInProgress_StatusIsFailed()
+    {
+        var order = InProgressOrder();
+        order.Fail("Part unavailable");
+        order.Status.Value.Should().Be(ExecutionStatus.Status.Failed);
+    }
+
+    [Fact]
+    public void Fail_FromInProgress_SetsFailureReasonAndFinishedAt()
+    {
+        var order = InProgressOrder();
+        order.Fail("Part unavailable");
+        order.FailureReason.Should().Be("Part unavailable");
+        order.FinishedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Fail_EmptyReason_Throws()
+    {
+        var order = InProgressOrder();
+        var act = () => order.Fail("   ");
+        act.Should().Throw<DomainException>();
+    }
+
+    [Fact]
+    public void Fail_StillQueued_Throws()
+    {
+        var order = ExecutionOrder.Create(Guid.NewGuid());
+        var act = () => order.Fail("too early");
+        act.Should().Throw<DomainException>();
+    }
 }

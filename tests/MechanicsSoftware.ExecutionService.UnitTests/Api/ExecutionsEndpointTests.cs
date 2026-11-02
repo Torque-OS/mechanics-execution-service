@@ -85,6 +85,51 @@ public class ExecutionsEndpointTests
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
+    [Fact]
+    public async Task Complete_InProgressOrder_PublishesExecutionCompleted()
+    {
+        await using var factory = new ExecutionApiFactory();
+        var orderId = await SeedQueuedOrderAsync(factory);
+        var client = factory.CreateClient();
+        await client.PostAsync($"/api/executions/{orderId}/start-diagnosis", null);
+
+        var response = await client.PostAsync($"/api/executions/{orderId}/complete", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await response.Content.ReadFromJsonAsync<ExecutionOrderResponse>();
+        result!.Status.Should().Be("COMPLETED");
+        factory.Events.Completed.Should().ContainSingle(o => o.Id == orderId);
+    }
+
+    [Fact]
+    public async Task Fail_InProgressOrder_PublishesExecutionFailed()
+    {
+        await using var factory = new ExecutionApiFactory();
+        var orderId = await SeedQueuedOrderAsync(factory);
+        var client = factory.CreateClient();
+        await client.PostAsync($"/api/executions/{orderId}/start-diagnosis", null);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/executions/{orderId}/fail", new FailExecutionRequest("Part unavailable"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await response.Content.ReadFromJsonAsync<ExecutionOrderResponse>();
+        result!.Status.Should().Be("FAILED");
+        factory.Events.Failed.Should().ContainSingle(o => o.Id == orderId);
+    }
+
+    [Fact]
+    public async Task Complete_StillQueued_Returns422()
+    {
+        await using var factory = new ExecutionApiFactory();
+        var orderId = await SeedQueuedOrderAsync(factory);
+        var client = factory.CreateClient();
+
+        var response = await client.PostAsync($"/api/executions/{orderId}/complete", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+
     private static async Task<Guid> SeedQueuedOrderAsync(ExecutionApiFactory factory)
     {
         await using var scope = factory.Services.CreateAsyncScope();
