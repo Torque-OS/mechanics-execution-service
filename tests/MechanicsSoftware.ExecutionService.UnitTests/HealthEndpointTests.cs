@@ -1,6 +1,6 @@
 using System.Net;
 using FluentAssertions;
-using Microsoft.AspNetCore.Mvc.Testing;
+using MechanicsSoftware.ExecutionService.UnitTests.Helpers;
 
 namespace MechanicsSoftware.ExecutionService.UnitTests;
 
@@ -9,7 +9,7 @@ public class HealthEndpointTests
     [Fact]
     public async Task Health_ReturnsOk()
     {
-        await using var factory = new WebApplicationFactory<Program>();
+        await using var factory = new ExecutionApiFactory();
         var client = factory.CreateClient();
 
         var response = await client.GetAsync("/health");
