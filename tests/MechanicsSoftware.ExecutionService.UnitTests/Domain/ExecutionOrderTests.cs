@@ -142,4 +142,38 @@ public class ExecutionOrderTests
         var act = () => order.Fail("too early");
         act.Should().Throw<DomainException>();
     }
+
+    [Fact]
+    public void Cancel_FromQueued_StatusIsCancelled()
+    {
+        var order = ExecutionOrder.Create(Guid.NewGuid());
+        order.Cancel();
+        order.Status.Value.Should().Be(ExecutionStatus.Status.Cancelled);
+    }
+
+    [Fact]
+    public void Cancel_FromInProgress_StatusIsCancelled()
+    {
+        var order = InProgressOrder();
+        order.Cancel();
+        order.Status.Value.Should().Be(ExecutionStatus.Status.Cancelled);
+    }
+
+    [Fact]
+    public void Cancel_FromCompleted_Throws()
+    {
+        var order = InProgressOrder();
+        order.Complete();
+        var act = () => order.Cancel();
+        act.Should().Throw<DomainException>();
+    }
+
+    [Fact]
+    public void Cancel_AlreadyCancelled_Throws()
+    {
+        var order = ExecutionOrder.Create(Guid.NewGuid());
+        order.Cancel();
+        var act = () => order.Cancel();
+        act.Should().Throw<DomainException>();
+    }
 }

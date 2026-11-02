@@ -26,7 +26,12 @@ projection of the queue — see [Persistence](#persistence)).
   list diagnosis/repair notes in MongoDB.
 - **Completion/failure (F4-20): done.** `POST /api/executions/{id}/complete` and `.../fail`
   publish `ExecutionCompleted`/`ExecutionFailed` — see [Saga messages](#saga-messages).
-- The compensation path is **F4-21** — not implemented yet. See the
+- **Compensation (F4-21): done.** Consumes `CancelExecution` from the OS Service and cancels the
+  order, wherever it is in the queue or in progress.
+- F4-18 to F4-21 (this repo's full scope) are complete. What's still missing for the real,
+  end-to-end Saga is outside this repo: the broker in the cluster (F4-08) and the OS Service's
+  orchestrator actually sending `EnqueueExecution`/`CancelExecution` and consuming
+  `ExecutionCompleted`/`ExecutionFailed` (F4-13/F4-22). See the
   [Fase 4 board](https://github.com/orgs/Torque-OS/projects/4).
 - No authentication on the API yet (unlike `mechanics-billing-service`, which requires a JWT on
   every controller) — the only endpoints today are read-only queue views. Add it alongside F4-19
@@ -87,11 +92,15 @@ only once `SaveChanges` commits.
 | Message | From | Payload |
 |---|---|---|
 | `EnqueueExecution` | OS Service | `{ serviceOrderId: guid, priority: int = 0 }` |
+| `CancelExecution` | OS Service (compensation) | `{ serviceOrderId: guid }` |
 
-- Idempotent: re-sending `EnqueueExecution` for an already-queued `serviceOrderId` is a no-op (enforced by a unique
-  index, not just the inbox).
+- Both are idempotent: re-sending `EnqueueExecution` for an already-queued `serviceOrderId`, or `CancelExecution` for
+  an already-cancelled one, is a no-op. `EnqueueExecution` is also backed by a unique index, not just the inbox.
+- `CancelExecution` is only sent while the order may still be cancelled — never after this service has already
+  published `ExecutionCompleted`.
 - Database failures are retried (1 s, 5 s, 15 s). A message that still fails goes to
-  `execution.enqueue-execution_error`; move it back with the RabbitMQ shovel/"Move messages" once the cause is fixed.
+  `execution.enqueue-execution_error` / `execution.cancel-execution_error`; move it back with the RabbitMQ
+  shovel/"Move messages" once the cause is fixed.
 - Local test without the OS Service — RabbitMQ UI → *Exchanges* → `TorqueOS.Contracts.Execution:EnqueueExecution` →
   *Publish message*, property `content_type` = `application/vnd.masstransit+json`, payload:
 
@@ -115,8 +124,8 @@ Saga, these are the events the OS Service's orchestrator reacts to.
 - Declare records with exactly this namespace, name and fields — MassTransit identifies a message by
   `urn:message:TorqueOS.Contracts.Execution:<Name>`. Copy them from
   `src/MechanicsSoftware.ExecutionService.Application/Contracts/`.
-- Each message has its own fanout exchange named `TorqueOS.Contracts.Execution:<Name>`; this service's consumer (for
-  `EnqueueExecution`) binds its queue to it automatically.
+- Each message has its own fanout exchange named `TorqueOS.Contracts.Execution:<Name>`; this service's consumers (for
+  `EnqueueExecution` and `CancelExecution`) bind their queues to it automatically.
 - `priority` is optional and currently unused by any real caller — every order queues at the same priority (plain
   FIFO by arrival) until the OS Service has a reason to set it.
 - `CorrelationId` on every published message is the `ServiceOrderId`.

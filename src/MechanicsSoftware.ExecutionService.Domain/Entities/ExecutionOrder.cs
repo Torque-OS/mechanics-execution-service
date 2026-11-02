@@ -68,4 +68,16 @@ public sealed class ExecutionOrder : Entity<Guid>
         FinishedAt = DateTime.UtcNow;
         FailureReason = reason;
     }
+
+    /// <summary>
+    /// Saga compensation (ADR-011, F4-21): the service order was cancelled because a later step
+    /// of the saga failed, so the queue entry or in-progress work is reverted. Valid from
+    /// <c>Queued</c> or <c>InProgress</c> — never from a terminal state (<c>Completed</c> can't
+    /// be un-done by this service; the saga wouldn't send this once execution already finished).
+    /// </summary>
+    public void Cancel()
+    {
+        Status = Status.TransitionTo(ExecutionStatus.Status.Cancelled);
+        FinishedAt = DateTime.UtcNow;
+    }
 }
