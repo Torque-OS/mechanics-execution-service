@@ -49,4 +49,31 @@ public class ExecutionOrderTests
         var act = () => ExecutionOrder.Create(Guid.NewGuid(), priority: -1);
         act.Should().Throw<DomainException>();
     }
+
+    [Fact]
+    public void StartDiagnosis_FromQueued_StatusIsInProgress()
+    {
+        var order = ExecutionOrder.Create(Guid.NewGuid());
+        order.StartDiagnosis();
+        order.Status.Value.Should().Be(ExecutionStatus.Status.InProgress);
+    }
+
+    [Fact]
+    public void StartDiagnosis_FromQueued_SetsStartedAt()
+    {
+        var order = ExecutionOrder.Create(Guid.NewGuid());
+        var before = DateTime.UtcNow;
+        order.StartDiagnosis();
+        order.StartedAt.Should().NotBeNull();
+        order.StartedAt.Should().BeOnOrAfter(before);
+    }
+
+    [Fact]
+    public void StartDiagnosis_AlreadyInProgress_Throws()
+    {
+        var order = ExecutionOrder.Create(Guid.NewGuid());
+        order.StartDiagnosis();
+        var act = () => order.StartDiagnosis();
+        act.Should().Throw<DomainException>();
+    }
 }
