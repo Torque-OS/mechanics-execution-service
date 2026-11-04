@@ -21,9 +21,11 @@ projection of the queue — see [Persistence](#persistence)).
 - **Execution queue (F4-18): done.** `EnqueueExecution` saga command in, queue entry out — see
   [Saga messages](#saga-messages). No broker/RabbitMQ provisioning in the cluster yet (F4-08);
   local development uses this repo's own `docker compose` RabbitMQ.
-- Diagnosis/repair status updates, publishing `ExecutionCompleted`/`ExecutionFailed`, and the
-  compensation path are **F4-19 to F4-21** — not implemented yet. See the
-  [Fase 4 board](https://github.com/orgs/Torque-OS/projects/4).
+- **Diagnosis/repair status (F4-19): done.** `POST /api/executions/{id}/start-diagnosis` moves
+  the order to `IN_PROGRESS` and off the queue; `POST/GET /api/executions/{id}/notes` record and
+  list diagnosis/repair notes in MongoDB.
+- Publishing `ExecutionCompleted`/`ExecutionFailed` and the compensation path are **F4-20 and
+  F4-21** — not implemented yet. See the [Fase 4 board](https://github.com/orgs/Torque-OS/projects/4).
 - No authentication on the API yet (unlike `mechanics-billing-service`, which requires a JWT on
   every controller) — the only endpoints today are read-only queue views. Add it alongside F4-19
   if staff-facing write actions are needed, or as its own issue.
@@ -51,11 +53,11 @@ Without Docker for the API: `docker compose up postgres mongo rabbitmq -d`, then
 - **PostgreSQL** (`execution_orders`): the system of record. One row per service order
   (`service_order_id` is unique — also how `EnqueueExecutionHandler` stays idempotent), plus the
   MassTransit transactional outbox/inbox tables.
-- **MongoDB** (`execution_queue`): a denormalized, priority-ordered view written alongside the
-  Postgres row. Reads for "what's next" don't compete with the transactional writes, and the
-  document shape can evolve in F4-19 (diagnosis notes) without a relational migration. This is a
-  read projection, not a queue broker — nothing dequeues from it yet (F4-19/F4-21 will, when a
-  diagnosis starts or a compensation cancels an entry).
+- **MongoDB**:
+  - `execution_queue` — a denormalized, priority-ordered view written alongside the Postgres row.
+    Reads for "what's next" don't compete with the transactional writes. An entry is removed when
+    diagnosis starts (F4-19) or a compensation cancels the order (F4-21).
+  - `execution_notes` — append-only diagnosis/repair notes (F4-19), one document per note.
 
 ## Endpoints
 
@@ -63,7 +65,12 @@ Without Docker for the API: `docker compose up postgres mongo rabbitmq -d`, then
 |---|---|---|
 | GET | `/api/executions` | Current queue, ordered by priority then arrival time |
 | GET | `/api/executions/{id}` | A single execution order |
+| POST | `/api/executions/{id}/start-diagnosis` | `QUEUED` → `IN_PROGRESS`; removes the order from the queue |
+| POST | `/api/executions/{id}/notes` | Record a diagnosis/repair note (only while `IN_PROGRESS`) — body `{ "text": "..." }` |
+| GET | `/api/executions/{id}/notes` | Notes for an order, oldest first |
 | GET | `/health` | Liveness/readiness probe |
+
+No authentication yet — see [Status](#status).
 
 ## Saga messages
 

@@ -7,8 +7,9 @@ public sealed record ExecutionOrderResponse(
     Guid ServiceOrderId,
     string Status,
     int Priority,
-    DateTime QueuedAt)
+    DateTime QueuedAt,
+    DateTime? StartedAt)
 {
     public static ExecutionOrderResponse From(ExecutionOrder order) =>
-        new(order.Id, order.ServiceOrderId, order.Status.ToString(), order.Priority, order.QueuedAt);
+        new(order.Id, order.ServiceOrderId, order.Status.ToString(), order.Priority, order.QueuedAt, order.StartedAt);
 }

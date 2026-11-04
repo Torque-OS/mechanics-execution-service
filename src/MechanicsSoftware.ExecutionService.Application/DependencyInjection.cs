@@ -12,6 +12,9 @@ public static class DependencyInjection
         services.AddScoped<EnqueueExecutionHandler>();
         services.AddScoped<GetExecutionQueueHandler>();
         services.AddScoped<GetExecutionHandler>();
+        services.AddScoped<StartDiagnosisHandler>();
+        services.AddScoped<AddExecutionNoteHandler>();
+        services.AddScoped<GetExecutionNotesHandler>();
 
         return services;
     }

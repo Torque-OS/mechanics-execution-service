@@ -20,6 +20,7 @@ public sealed class ExecutionOrder : Entity<Guid>
     public int Priority { get; private set; }
 
     public DateTime QueuedAt { get; private set; }
+    public DateTime? StartedAt { get; private set; }
 
     private ExecutionOrder() { }
 
@@ -39,5 +40,12 @@ public sealed class ExecutionOrder : Entity<Guid>
             Status = ExecutionStatus.CreateQueued(),
             QueuedAt = DateTime.UtcNow
         };
+    }
+
+    /// <summary>Diagnosis/repair work begins; the order leaves the queue (F4-19).</summary>
+    public void StartDiagnosis()
+    {
+        Status = Status.TransitionTo(ExecutionStatus.Status.InProgress);
+        StartedAt = DateTime.UtcNow;
     }
 }

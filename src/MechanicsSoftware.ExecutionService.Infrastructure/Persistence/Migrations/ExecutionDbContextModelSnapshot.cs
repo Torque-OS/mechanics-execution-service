@@ -209,6 +209,10 @@ namespace MechanicsSoftware.ExecutionService.Infrastructure.Persistence.Migratio
                         .HasColumnType("uuid")
                         .HasColumnName("service_order_id");
 
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
