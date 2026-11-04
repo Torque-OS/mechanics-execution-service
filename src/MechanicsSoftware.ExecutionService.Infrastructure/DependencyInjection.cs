@@ -42,6 +42,7 @@ public static class DependencyInjection
         services.AddMassTransit(bus =>
         {
             bus.AddConsumer<EnqueueExecutionConsumer, EnqueueExecutionConsumerDefinition>();
+            bus.AddConsumer<CancelExecutionConsumer, CancelExecutionConsumerDefinition>();
 
             bus.AddEntityFrameworkOutbox<ExecutionDbContext>(outbox =>
             {
