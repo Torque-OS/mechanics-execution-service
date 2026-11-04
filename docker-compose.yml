@@ -7,12 +7,15 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=execution;Username=postgres;Password=postgres
-      ConnectionStrings__Mongo: mongodb://mongo:27017
+      ConnectionStrings__Mongo: mongodb://mongo:27017/execution
+      RABBITMQ_CONNECTION_STRING: amqp://guest:guest@rabbitmq:5672/
     depends_on:
       postgres:
         condition: service_healthy
       mongo:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
 
   postgres:
     image: postgres:16-alpine
@@ -36,6 +39,19 @@ services:
       - "27019:27017"
     volumes:
       - execution_mongodata:/data/db
+
+  # Saga broker (ADR-011) for local development; management UI at http://localhost:15673 (guest/guest).
+  # In the cluster, this points at the shared RabbitMQ provisioned by mechanics-infra-k8s instead.
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
 
 volumes:
   execution_pgdata:
