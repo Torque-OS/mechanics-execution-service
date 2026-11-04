@@ -1,15 +1,27 @@
+using MechanicsSoftware.ExecutionService.Application.UseCases.Executions.Handlers;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MechanicsSoftware.ExecutionService.Api.Controllers;
 
-// Placeholder for the Execution Service's own endpoints (execution queue, diagnosis/repair
-// status — F4-18/F4-19). Domain, Application and Infrastructure layers are added there,
-// mirroring the layout of mechanics-software (ADR-004).
+// Read-only for now: entries only arrive via the EnqueueExecution saga command
+// (EnqueueExecutionConsumer). Staff-facing write actions (start diagnosis, etc.) are F4-19.
 [ApiController]
 [Route("api/executions")]
-public class ExecutionQueueController : ControllerBase
+public class ExecutionQueueController(
+    GetExecutionQueueHandler getQueueHandler,
+    GetExecutionHandler getHandler) : ControllerBase
 {
+    [HttpGet]
+    public async Task<IActionResult> GetQueue(CancellationToken cancellationToken)
+    {
+        var result = await getQueueHandler.ExecuteAsync(cancellationToken);
+        return Ok(result);
+    }
+
     [HttpGet("{id:guid}")]
-    public IActionResult Get(Guid id) =>
-        StatusCode(StatusCodes.Status501NotImplemented, new { message = "Not implemented yet — see F4-18." });
+    public async Task<IActionResult> Get(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await getHandler.ExecuteAsync(id, cancellationToken);
+        return Ok(result);
+    }
 }
