@@ -5,8 +5,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace MechanicsSoftware.ExecutionService.Api.Controllers;
 
 // Entries arrive via the EnqueueExecution saga command (EnqueueExecutionConsumer). Staff drive
-// diagnosis/repair (F4-19) through these endpoints; completion/failure (F4-20) and the
-// compensation path (F4-21) are the remaining Saga-only pieces.
+// diagnosis/repair (F4-19), completion and failure (F4-20) through these endpoints; the
+// compensation path (F4-21, triggered by the OS Service) is the remaining Saga-only piece.
 [ApiController]
 [Route("api/executions")]
 public class ExecutionQueueController(
@@ -14,7 +14,9 @@ public class ExecutionQueueController(
     GetExecutionHandler getHandler,
     StartDiagnosisHandler startDiagnosisHandler,
     AddExecutionNoteHandler addNoteHandler,
-    GetExecutionNotesHandler getNotesHandler) : ControllerBase
+    GetExecutionNotesHandler getNotesHandler,
+    CompleteExecutionHandler completeHandler,
+    FailExecutionHandler failHandler) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetQueue(CancellationToken cancellationToken)
@@ -48,6 +50,20 @@ public class ExecutionQueueController(
     public async Task<IActionResult> GetNotes(Guid id, CancellationToken cancellationToken)
     {
         var result = await getNotesHandler.ExecuteAsync(id, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("{id:guid}/complete")]
+    public async Task<IActionResult> Complete(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await completeHandler.ExecuteAsync(id, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("{id:guid}/fail")]
+    public async Task<IActionResult> Fail(Guid id, FailExecutionRequest request, CancellationToken cancellationToken)
+    {
+        var result = await failHandler.ExecuteAsync(id, request.Reason, cancellationToken);
         return Ok(result);
     }
 }

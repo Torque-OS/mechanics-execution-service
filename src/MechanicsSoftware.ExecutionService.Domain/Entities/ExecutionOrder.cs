@@ -21,6 +21,8 @@ public sealed class ExecutionOrder : Entity<Guid>
 
     public DateTime QueuedAt { get; private set; }
     public DateTime? StartedAt { get; private set; }
+    public DateTime? FinishedAt { get; private set; }
+    public string? FailureReason { get; private set; }
 
     private ExecutionOrder() { }
 
@@ -47,5 +49,23 @@ public sealed class ExecutionOrder : Entity<Guid>
     {
         Status = Status.TransitionTo(ExecutionStatus.Status.InProgress);
         StartedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Repair finished successfully; publishes <c>ExecutionCompleted</c> (F4-20).</summary>
+    public void Complete()
+    {
+        Status = Status.TransitionTo(ExecutionStatus.Status.Completed);
+        FinishedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Repair could not be finished; publishes <c>ExecutionFailed</c> (F4-20) — triggers Saga compensation.</summary>
+    public void Fail(string reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new DomainException("Failure reason is required.");
+
+        Status = Status.TransitionTo(ExecutionStatus.Status.Failed);
+        FinishedAt = DateTime.UtcNow;
+        FailureReason = reason;
     }
 }

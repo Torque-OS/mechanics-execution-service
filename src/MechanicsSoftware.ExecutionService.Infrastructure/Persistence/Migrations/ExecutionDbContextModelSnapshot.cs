@@ -197,6 +197,15 @@ namespace MechanicsSoftware.ExecutionService.Infrastructure.Persistence.Migratio
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<DateTime?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
                     b.Property<int>("Priority")
                         .HasColumnType("integer")
                         .HasColumnName("priority");
