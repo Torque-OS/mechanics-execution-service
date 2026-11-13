@@ -1,0 +1,149 @@
+{
+  "info": {
+    "name": "Mechanics Execution Service API (Fase 4)",
+    "description": "API collection for the Execution Service microservice (Execution Queue, Diagnosis, Repair Notes & Completion/Failure) — FIAP POS Tech 15SOAT Fase 4.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8082", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "executionId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Executions",
+      "item": [
+        {
+          "name": "List Execution Queue (Ordered by Priority & Arrival)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const list = pm.response.json();",
+                  "    if (Array.isArray(list) && list.length > 0) {",
+                  "        pm.collectionVariables.set('executionId', list[0].id || list[0].executionOrderId);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/executions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "executions"]
+            }
+          }
+        },
+        {
+          "name": "Get Execution by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/executions/{{executionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "executions", "{{executionId}}"]
+            }
+          }
+        },
+        {
+          "name": "Start Diagnosis",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/executions/{{executionId}}/start-diagnosis",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "executions", "{{executionId}}", "start-diagnosis"]
+            }
+          }
+        },
+        {
+          "name": "Add Execution Note (MongoDB)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"author\": \"Mecânico Chefe\",\n  \"content\": \"Diagnóstico concluído: substituição de filtro e óleo iniciada.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/executions/{{executionId}}/notes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "executions", "{{executionId}}", "notes"]
+            }
+          }
+        },
+        {
+          "name": "Get Execution Notes (MongoDB)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/executions/{{executionId}}/notes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "executions", "{{executionId}}", "notes"]
+            }
+          }
+        },
+        {
+          "name": "Complete Execution (Publishes ExecutionCompleted)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/executions/{{executionId}}/complete",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "executions", "{{executionId}}", "complete"]
+            }
+          }
+        },
+        {
+          "name": "Fail Execution (Publishes ExecutionFailed -> Saga Compensation)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Trinca estrutural no bloco do motor\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/executions/{{executionId}}/fail",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "executions", "{{executionId}}", "fail"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
