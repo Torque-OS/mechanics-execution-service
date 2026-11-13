@@ -138,6 +138,11 @@ k8s/                                                     Namespace, Deployment, 
   running — `deploy.yml` will fail at the `aws eks update-kubeconfig` step until both exist. The
   pipeline is ready; the infrastructure to run it against isn't.
 
+## Testing & Coverage Evidence (F4-28)
+
+```bash
+dotnet test --collect:"XPlat Code Coverage" --settings coverlet.runsettings
+
 ## Contributing
 
 `main` is protected — open a PR from a branch and get one approval. Conventional commits.
