@@ -24,7 +24,7 @@ public sealed class CancelExecutionConsumerTests : IAsyncLifetime
     private ServiceProvider _provider = null!;
     private ITestHarness _harness = null!;
 
-    public async Task InitializeAsync()
+    public Task InitializeAsync()
     {
         _provider = new ServiceCollection()
             .AddDbContext<ExecutionDbContext>(options => options.UseInMemoryDatabase(_databaseName))
@@ -34,7 +34,7 @@ public sealed class CancelExecutionConsumerTests : IAsyncLifetime
             .AddMassTransitTestHarness(bus => bus.AddConsumer<CancelExecutionConsumer>())
             .BuildServiceProvider(true);
         _harness = _provider.GetRequiredService<ITestHarness>();
-        await _harness.Start();
+        return Task.CompletedTask;
     }
 
     public async Task DisposeAsync() => await _provider.DisposeAsync();
@@ -53,6 +53,7 @@ public sealed class CancelExecutionConsumerTests : IAsyncLifetime
     public async Task CancelExecution_CancelsTheOrder()
     {
         var order = await SeedQueuedOrderAsync();
+        await _harness.Start();
 
         await _harness.Bus.Publish(new CancelExecution(order.ServiceOrderId));
 
@@ -66,6 +67,8 @@ public sealed class CancelExecutionConsumerTests : IAsyncLifetime
     [Fact]
     public async Task CancelExecution_UnknownServiceOrder_FaultsWithoutThrowingUnhandled()
     {
+        await _harness.Start();
+
         await _harness.Bus.Publish(new CancelExecution(Guid.NewGuid()));
 
         (await _harness.Published.Any<Fault<CancelExecution>>()).Should().BeTrue();
