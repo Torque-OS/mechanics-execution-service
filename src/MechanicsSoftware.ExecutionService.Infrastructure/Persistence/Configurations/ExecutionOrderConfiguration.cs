@@ -29,6 +29,9 @@ public sealed class ExecutionOrderConfiguration : IEntityTypeConfiguration<Execu
 
         builder.Property(e => e.Priority).HasColumnName("priority").IsRequired();
         builder.Property(e => e.QueuedAt).HasColumnName("queued_at").IsRequired();
+        builder.Property(e => e.StartedAt).HasColumnName("started_at");
+        builder.Property(e => e.FinishedAt).HasColumnName("finished_at");
+        builder.Property(e => e.FailureReason).HasColumnName("failure_reason").HasMaxLength(500);
     }
 
     private static readonly Dictionary<string, ExecutionStatus.Status> _statusMap = new()

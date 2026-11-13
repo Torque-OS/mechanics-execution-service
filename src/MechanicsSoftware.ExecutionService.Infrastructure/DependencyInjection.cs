@@ -42,6 +42,7 @@ public static class DependencyInjection
         services.AddMassTransit(bus =>
         {
             bus.AddConsumer<EnqueueExecutionConsumer, EnqueueExecutionConsumerDefinition>();
+            bus.AddConsumer<CancelExecutionConsumer, CancelExecutionConsumerDefinition>();
 
             bus.AddEntityFrameworkOutbox<ExecutionDbContext>(outbox =>
             {
@@ -61,6 +62,8 @@ public static class DependencyInjection
         services.AddSingleton<IMongoClient>(_ => new MongoClient(mongoUrl));
         services.AddSingleton(sp => sp.GetRequiredService<IMongoClient>().GetDatabase(mongoUrl.DatabaseName ?? "execution"));
         services.AddScoped<IExecutionQueue, MongoExecutionQueue>();
+        services.AddScoped<IExecutionNotes, MongoExecutionNotes>();
+        services.AddScoped<IExecutionEventPublisher, MassTransitExecutionEventPublisher>();
 
         return services;
     }
