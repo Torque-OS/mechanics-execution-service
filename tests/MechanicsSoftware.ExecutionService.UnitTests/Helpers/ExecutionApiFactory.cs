@@ -23,12 +23,15 @@ public sealed class ExecutionApiFactory : WebApplicationFactory<Program>
     public InMemoryExecutionNotes Notes { get; } = new();
     public RecordingExecutionEventPublisher Events { get; } = new();
 
+    public HttpClient CreateStaffClient() => CreateClient().WithToken(TestTokens.Staff());
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:DefaultConnection", "Host=unused-in-tests");
         builder.UseSetting("ConnectionStrings:Mongo", "mongodb://unused-in-tests:27017/execution");
         builder.UseSetting("RABBITMQ_CONNECTION_STRING", "amqp://guest:guest@unused-in-tests:5672/");
+        builder.UseSetting("JWT_SECRET", TestTokens.Secret);
 
         builder.ConfigureTestServices(services =>
         {

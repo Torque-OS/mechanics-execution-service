@@ -1,5 +1,7 @@
 using MechanicsSoftware.ExecutionService.Api.Transport;
 using MechanicsSoftware.ExecutionService.Application.UseCases.Executions.Handlers;
+using MechanicsSoftware.ExecutionService.Domain.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MechanicsSoftware.ExecutionService.Api.Controllers;
@@ -9,6 +11,7 @@ namespace MechanicsSoftware.ExecutionService.Api.Controllers;
 // compensation path (F4-21, triggered by the OS Service) is the remaining Saga-only piece.
 [ApiController]
 [Route("api/executions")]
+[Authorize(Policy = Policies.Staff)]
 public class ExecutionQueueController(
     GetExecutionQueueHandler getQueueHandler,
     GetExecutionHandler getHandler,

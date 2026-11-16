@@ -90,6 +90,7 @@ jobs:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           MONGO_CONNECTION_STRING: ${{ secrets.MONGO_CONNECTION_STRING }}
           RABBITMQ_CONNECTION_STRING: ${{ secrets.RABBITMQ_CONNECTION_STRING }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: envsubst < k8s/secret.yaml > /tmp/secret.rendered.yaml && cp /tmp/secret.rendered.yaml k8s/secret.yaml
 
       - name: Pin image tag in deployment manifest

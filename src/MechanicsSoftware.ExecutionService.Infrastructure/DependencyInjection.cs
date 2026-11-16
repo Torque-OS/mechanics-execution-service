@@ -4,6 +4,7 @@ using MechanicsSoftware.ExecutionService.Application.Abstractions;
 using MechanicsSoftware.ExecutionService.Infrastructure.Messaging;
 using MechanicsSoftware.ExecutionService.Infrastructure.Persistence;
 using MechanicsSoftware.ExecutionService.Infrastructure.Queue;
+using MechanicsSoftware.ExecutionService.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +33,8 @@ public static class DependencyInjection
         if (string.IsNullOrWhiteSpace(rabbitMqConnectionString))
             throw new InvalidOperationException(
                 "RabbitMQ not configured. Set 'RABBITMQ_CONNECTION_STRING' (amqp://user:password@host:5672/).");
+
+        services.AddPlatformAuthentication(configuration);
 
         services.AddDbContext<ExecutionDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<IExecutionDbContext>(sp => sp.GetRequiredService<ExecutionDbContext>());

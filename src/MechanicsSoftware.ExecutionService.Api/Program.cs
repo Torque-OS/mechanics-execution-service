@@ -36,6 +36,7 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 // Liveness/readiness probe for Kubernetes (see k8s/deployment.yaml).
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "execution-service" }));
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
