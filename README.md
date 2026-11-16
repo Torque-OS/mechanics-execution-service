@@ -19,8 +19,8 @@ projection of the queue — see [Persistence](#persistence)).
 
 - **Scaffold (F4-06): done.**
 - **Execution queue (F4-18): done.** `EnqueueExecution` saga command in, queue entry out — see
-  [Saga messages](#saga-messages). No broker/RabbitMQ provisioning in the cluster yet (F4-08);
-  local development uses this repo's own `docker compose` RabbitMQ.
+  [Saga messages](#saga-messages). In the cluster the broker comes from `mechanics-infra-k8s` (F4-08,
+  see [Broker in the cluster](#broker-in-the-cluster)); local development uses this repo's own `docker compose` RabbitMQ.
 - **Diagnosis/repair status (F4-19): done.** `POST /api/executions/{id}/start-diagnosis` moves
   the order to `IN_PROGRESS` and off the queue; `POST/GET /api/executions/{id}/notes` record and
   list diagnosis/repair notes in MongoDB.
@@ -28,14 +28,13 @@ projection of the queue — see [Persistence](#persistence)).
   publish `ExecutionCompleted`/`ExecutionFailed` — see [Saga messages](#saga-messages).
 - **Compensation (F4-21): done.** Consumes `CancelExecution` from the OS Service and cancels the
   order, wherever it is in the queue or in progress.
-- F4-18 to F4-21 (this repo's full scope) are complete. What's still missing for the real,
-  end-to-end Saga is outside this repo: the broker in the cluster (F4-08) and the OS Service's
-  orchestrator actually sending `EnqueueExecution`/`CancelExecution` and consuming
-  `ExecutionCompleted`/`ExecutionFailed` (F4-13/F4-22). See the
-  [Fase 4 board](https://github.com/orgs/Torque-OS/projects/4).
-- No authentication on the API yet (unlike `mechanics-billing-service`, which requires a JWT on
-  every controller) — the only endpoints today are read-only queue views. Add it alongside F4-19
-  if staff-facing write actions are needed, or as its own issue.
+- **Messaging reliability (F4-24): done.** Inbox, outbox and the shared retry policy on every consumer.
+- The OS Service sends `EnqueueExecution` and consumes `ExecutionCompleted`/`ExecutionFailed` (F4-12, F4-22).
+  It does not send `CancelExecution` yet: the current compensations happen before an order is enqueued or after
+  the execution itself failed. See the [Fase 4 board](https://github.com/orgs/Torque-OS/projects/4).
+- No authentication on the API yet (unlike `mechanics-billing-service`, which requires a JWT on every controller),
+  although `complete`/`fail` now drive the Saga. The service is `ClusterIP` only; add the same JWT `Staff` policy
+  before any API Gateway route points here.
 
 ## Stack
 
@@ -98,7 +97,9 @@ only once `SaveChanges` commits.
   an already-cancelled one, is a no-op. `EnqueueExecution` is also backed by a unique index, not just the inbox.
 - `CancelExecution` is only sent while the order may still be cancelled — never after this service has already
   published `ExecutionCompleted`.
-- Database failures are retried (1 s, 5 s, 15 s). A message that still fails goes to
+- **Retry (F4-24), the same for every consumer** (`SagaRetryPolicy`, shared with the Billing Service): transient
+  failures (database, broker) are retried 5 times with exponential backoff, about 16 s in total. Business rule
+  violations and unknown orders are permanent and are not retried. A message that still fails goes to
   `execution.enqueue-execution_error` / `execution.cancel-execution_error`; move it back with the RabbitMQ
   shovel/"Move messages" once the cause is fixed.
 - Local test without the OS Service — RabbitMQ UI → *Exchanges* → `TorqueOS.Contracts.Execution:EnqueueExecution` →
@@ -116,10 +117,10 @@ only once `SaveChanges` commits.
 | `ExecutionCompleted` | OS Service | `{ serviceOrderId, executionOrderId, completedAt }` |
 | `ExecutionFailed` | OS Service | `{ serviceOrderId, executionOrderId, reason, failedAt }` — triggers Saga compensation |
 
-Sent from `POST /api/executions/{id}/complete` / `.../fail` today (staff-driven); once F4-13/F4-22 wire the real
-Saga, these are the events the OS Service's orchestrator reacts to.
+Sent from `POST /api/executions/{id}/complete` / `.../fail` (staff-driven). The OS Service's orchestrator consumes them
+(F4-12): `ExecutionCompleted` completes the service order, `ExecutionFailed` cancels it and compensates the payment.
 
-**For the OS Service (F4-13/F4-22, the Saga orchestrator):**
+**For the OS Service (the Saga orchestrator):**
 
 - Declare records with exactly this namespace, name and fields — MassTransit identifies a message by
   `urn:message:TorqueOS.Contracts.Execution:<Name>`. Copy them from
@@ -131,13 +132,11 @@ Saga, these are the events the OS Service's orchestrator reacts to.
 - `CorrelationId` on every published message is the `ServiceOrderId`.
 - Evolution: fields are only ever added. A breaking change gets a new type (e.g. `EnqueueExecutionV2`).
 
-## Known infrastructure gap
+## Broker in the cluster
 
-`mechanics-infra-k8s`'s RabbitMQ provisioning (F4-08) gives each service its **own vhost**
-(`/os`, `/billing`, `/execution`) with no cross-vhost federation/shovel configured. RabbitMQ vhosts are isolated
-namespaces, so as provisioned today, a message published in one service's vhost cannot reach a consumer bound to
-another vhost — which would block the real cross-service Saga once it's wired (F4-13/F4-22). Worth confirming with
-whoever owns F4-08 before relying on it for the end-to-end demo.
+`mechanics-infra-k8s` (F4-08) provisions one RabbitMQ shared by the three services, with a **single vhost,
+`/torque-os`**, and one user per service. The vhost must be URL-encoded in `RABBITMQ_CONNECTION_STRING`:
+`amqp://execution-service:<password>@rabbitmq.messaging.svc.cluster.local:5672/%2Ftorque-os`.
 
 ## Project layout
 

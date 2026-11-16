@@ -1,8 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using MassTransit;
-using MechanicsSoftware.ExecutionService.Application.Exceptions;
 using MechanicsSoftware.ExecutionService.Application.UseCases.Executions.Handlers;
-using MechanicsSoftware.ExecutionService.Domain.Exceptions;
 using MechanicsSoftware.ExecutionService.Infrastructure.Persistence;
 using TorqueOS.Contracts.Execution;
 
@@ -34,13 +32,7 @@ public sealed class CancelExecutionConsumerDefinition : ConsumerDefinition<Cance
         IConsumerConfigurator<CancelExecutionConsumer> consumerConfigurator,
         IRegistrationContext context)
     {
-        endpointConfigurator.UseMessageRetry(retry =>
-        {
-            retry.Intervals(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15));
-            retry.Ignore<DomainException>();
-            retry.Ignore<NotFoundException>();
-        });
-
+        endpointConfigurator.UseMessageRetry(SagaRetryPolicy.Configure);
         endpointConfigurator.UseEntityFrameworkOutbox<ExecutionDbContext>(context);
     }
 }
