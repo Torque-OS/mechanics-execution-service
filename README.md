@@ -32,9 +32,10 @@ projection of the queue — see [Persistence](#persistence)).
 - The OS Service sends `EnqueueExecution` and consumes `ExecutionCompleted`/`ExecutionFailed` (F4-12, F4-22).
   It does not send `CancelExecution` yet: the current compensations happen before an order is enqueued or after
   the execution itself failed. See the [Fase 4 board](https://github.com/orgs/Torque-OS/projects/4).
-- No authentication on the API yet (unlike `mechanics-billing-service`, which requires a JWT on every controller),
-  although `complete`/`fail` now drive the Saga. The service is `ClusterIP` only; add the same JWT `Staff` policy
-  before any API Gateway route points here.
+- **Authentication and API Gateway (F4-13): done.** Every `/api/executions` route requires a platform JWT with a staff
+  role (`ADMIN`, `ATTENDANT` or `MECHANIC`), validated with the same `JWT_SECRET`, issuer and audience as the other
+  services. The Service is a `NodePort` (30082) that the API Gateway in `mechanics-infra-k8s` routes `/api/executions`
+  to — see [Authentication](#authentication).
 
 ## Stack
 
@@ -78,7 +79,26 @@ Without Docker for the API: `docker compose up postgres mongo rabbitmq -d`, then
 | POST | `/api/executions/{id}/fail` | `IN_PROGRESS` → `FAILED`; publishes `ExecutionFailed` — body `{ "reason": "..." }` |
 | GET | `/health` | Liveness/readiness probe |
 
-No authentication yet — see [Status](#status).
+Every route except `/health` requires `Authorization: Bearer <staff JWT>` — see [Authentication](#authentication).
+
+## Authentication
+
+- Tokens are issued by `mechanics-software` (`POST /api/auth/login`, staff) or by `mechanics-lambda` (`POST /auth`,
+  customers by CPF). This service only validates them; it never issues one.
+- `JWT_SECRET` must be the same in `mechanics-lambda`, `mechanics-software`, `mechanics-billing-service` and here.
+  `JWT_ISSUER` and `JWT_AUDIENCE` default to `torque-os` and `mechanics-software-api`, like everywhere else.
+- No token or an invalid one → `401`; a valid customer token → `403`; a staff token → the route runs.
+- In the cluster the API Gateway (`mechanics-infra-k8s`) also checks the token with the Lambda authorizer and routes
+  `/api/executions` to the `NodePort` 30082 Service. The Service keeps its cluster-internal address, so in-cluster
+  callers are unaffected.
+- Locally, `docker compose` sets the development secret; get a staff token from `mechanics-software`
+  (`admin@mechanics.local` / `Admin@123` in Development):
+
+```bash
+TOKEN=$(curl -s -H 'Content-Type: application/json' -d '{"email":"admin@mechanics.local","password":"Admin@123"}' \
+  http://localhost:8080/api/auth/login | jq -r .token)
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8082/api/executions
+```
 
 ## Saga messages
 
@@ -167,7 +187,7 @@ k8s/                                                     Namespace, Deployment, 
   [`mechanics-infra-k8s`](https://github.com/Torque-OS/mechanics-infra-k8s), F4-08/F4-09) —
   **requires** these repo secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (same IAM user as
   `mechanics-software`), `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `MONGO_CONNECTION_STRING`,
-  `RABBITMQ_CONNECTION_STRING`. None of these are set yet, and the EKS cluster isn't currently
+  `RABBITMQ_CONNECTION_STRING`, `JWT_SECRET`. None of these are set yet, and the EKS cluster isn't currently
   running — `deploy.yml` will fail at the `aws eks update-kubeconfig` step until both exist. The
   pipeline is ready; the infrastructure to run it against isn't.
 

@@ -20,7 +20,7 @@ public class ExecutionsEndpointTests
         await using var factory = new ExecutionApiFactory();
         await factory.Queue.EnqueueAsync(new ExecutionQueueEntry(Guid.NewGuid(), Guid.NewGuid(), Priority: 5, QueuedAt: DateTime.UtcNow));
         await factory.Queue.EnqueueAsync(new ExecutionQueueEntry(Guid.NewGuid(), Guid.NewGuid(), Priority: 1, QueuedAt: DateTime.UtcNow));
-        var client = factory.CreateClient();
+        var client = factory.CreateStaffClient();
 
         var response = await client.GetAsync("/api/executions");
 
@@ -34,7 +34,7 @@ public class ExecutionsEndpointTests
     public async Task Get_UnknownId_Returns404()
     {
         await using var factory = new ExecutionApiFactory();
-        var client = factory.CreateClient();
+        var client = factory.CreateStaffClient();
 
         var response = await client.GetAsync($"/api/executions/{Guid.NewGuid()}");
 
@@ -46,7 +46,7 @@ public class ExecutionsEndpointTests
     {
         await using var factory = new ExecutionApiFactory();
         var orderId = await SeedQueuedOrderAsync(factory);
-        var client = factory.CreateClient();
+        var client = factory.CreateStaffClient();
 
         var response = await client.PostAsync($"/api/executions/{orderId}/start-diagnosis", null);
 
@@ -60,7 +60,7 @@ public class ExecutionsEndpointTests
     {
         await using var factory = new ExecutionApiFactory();
         var orderId = await SeedQueuedOrderAsync(factory);
-        var client = factory.CreateClient();
+        var client = factory.CreateStaffClient();
         await client.PostAsync($"/api/executions/{orderId}/start-diagnosis", null);
 
         var addResponse = await client.PostAsJsonAsync(
@@ -77,7 +77,7 @@ public class ExecutionsEndpointTests
     {
         await using var factory = new ExecutionApiFactory();
         var orderId = await SeedQueuedOrderAsync(factory);
-        var client = factory.CreateClient();
+        var client = factory.CreateStaffClient();
 
         var response = await client.PostAsJsonAsync(
             $"/api/executions/{orderId}/notes", new AddExecutionNoteRequest("too early"));
@@ -90,7 +90,7 @@ public class ExecutionsEndpointTests
     {
         await using var factory = new ExecutionApiFactory();
         var orderId = await SeedQueuedOrderAsync(factory);
-        var client = factory.CreateClient();
+        var client = factory.CreateStaffClient();
         await client.PostAsync($"/api/executions/{orderId}/start-diagnosis", null);
 
         var response = await client.PostAsync($"/api/executions/{orderId}/complete", null);
@@ -106,7 +106,7 @@ public class ExecutionsEndpointTests
     {
         await using var factory = new ExecutionApiFactory();
         var orderId = await SeedQueuedOrderAsync(factory);
-        var client = factory.CreateClient();
+        var client = factory.CreateStaffClient();
         await client.PostAsync($"/api/executions/{orderId}/start-diagnosis", null);
 
         var response = await client.PostAsJsonAsync(
@@ -123,7 +123,7 @@ public class ExecutionsEndpointTests
     {
         await using var factory = new ExecutionApiFactory();
         var orderId = await SeedQueuedOrderAsync(factory);
-        var client = factory.CreateClient();
+        var client = factory.CreateStaffClient();
 
         var response = await client.PostAsync($"/api/executions/{orderId}/complete", null);
 
