@@ -36,6 +36,7 @@ projection of the queue — see [Persistence](#persistence)).
   role (`ADMIN`, `ATTENDANT` or `MECHANIC`), validated with the same `JWT_SECRET`, issuer and audience as the other
   services. The Service is a `NodePort` (30082) that the API Gateway in `mechanics-infra-k8s` routes `/api/executions`
   to — see [Authentication](#authentication).
+- **Distributed tracing (F4-36): done.** See [Observability](#observability).
 
 ## Stack
 
@@ -151,6 +152,21 @@ Sent from `POST /api/executions/{id}/complete` / `.../fail` (staff-driven). The 
   FIFO by arrival) until the OS Service has a reason to set it.
 - `CorrelationId` on every published message is the `ServiceOrderId`.
 - Evolution: fields are only ever added. A breaking change gets a new type (e.g. `EnqueueExecutionV2`).
+
+## Observability
+
+OpenTelemetry traces every inbound HTTP request and every MassTransit publish/consume (ADR-011, F4-36), so a
+`ServiceOrderId`'s trace continues from the OS Service's saga orchestrator into this service's `EnqueueExecution`
+consumer — the message headers already carry W3C trace context automatically, courtesy of MassTransit's own
+`ActivitySource`. Nothing is exported unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set (empty/unset in local `docker
+compose` by default — point it at a local collector such as Jaeger or the cluster's Datadog Agent to see spans); the
+exporter is otherwise left out of the pipeline entirely.
+
+- **Do not set `options.Endpoint` on the OTLP exporter in code.** The exporter only appends the per-signal path
+  (`/v1/traces`) when it reads `OTEL_EXPORTER_OTLP_ENDPOINT`/`OTEL_EXPORTER_OTLP_PROTOCOL` itself; overwriting
+  `Endpoint` afterwards replaces that already-suffixed URI with the bare host, and the collector 404s every export —
+  silently, since OTel's own export failures aren't logged by default. Confirmed against a real Jaeger instance
+  while implementing this issue (traces simply never arrived, with no error anywhere, until this was fixed).
 
 ## Broker in the cluster
 
