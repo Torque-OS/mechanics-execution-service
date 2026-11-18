@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Mechanics Execution Service API (Fase 4)",
-    "description": "API collection for the Execution Service microservice (Execution Queue, Diagnosis, Repair Notes & Completion/Failure) — FIAP POS Tech 15SOAT Fase 4.",
+    "description": "API collection for the Execution Service microservice (Execution Queue, Diagnosis, Repair Notes & Completion/Failure) — FIAP POS Tech 15SOAT Fase 4.\n\n**Token:** the Execution Service has no login. Put a staff JWT in the `token` variable, from mechanics-software (`POST /api/auth/login`, `admin@mechanics.local` / `Admin@123` in Development). Every route except `/health` is staff only; a customer token gets `403`.\n\n**Where orders come from:** there is no create route. An execution order is created when the OS Service sends `EnqueueExecution` after the payment is confirmed. Run the OS and Billing flow first (or publish `EnqueueExecution` from the RabbitMQ management UI).\n\n**Order:** run List Execution Queue (saves `executionId` from the first entry), then Start Diagnosis, Add Execution Note, and finally Complete Execution or Fail Execution. Notes, Complete and Fail only work while the order is `IN_PROGRESS`; Complete and Fail are alternatives, so pick one per order. Start Diagnosis removes the order from the queue, so keep `executionId` for the requests after it.\n\n**Deployed:** set `baseUrl` to the API Gateway URL; `/api/executions` is routed to this service.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -33,7 +33,7 @@
                   "if (pm.response.code === 200) {",
                   "    const list = pm.response.json();",
                   "    if (Array.isArray(list) && list.length > 0) {",
-                  "        pm.collectionVariables.set('executionId', list[0].id || list[0].executionOrderId);",
+                  "        pm.collectionVariables.set('executionId', list[0].executionOrderId);",
                   "    }",
                   "}"
                 ],
@@ -43,6 +43,7 @@
           ],
           "request": {
             "method": "GET",
+            "description": "Orders still waiting (`QUEUED`), read from the MongoDB projection. Saves the first `executionOrderId` as `executionId`.",
             "url": {
               "raw": "{{baseUrl}}/api/executions",
               "host": ["{{baseUrl}}"],
@@ -65,6 +66,7 @@
           "name": "Start Diagnosis",
           "request": {
             "method": "POST",
+            "description": "`QUEUED` → `IN_PROGRESS`; removes the order from the queue.",
             "url": {
               "raw": "{{baseUrl}}/api/executions/{{executionId}}/start-diagnosis",
               "host": ["{{baseUrl}}"],
@@ -76,10 +78,11 @@
           "name": "Add Execution Note (MongoDB)",
           "request": {
             "method": "POST",
+            "description": "Only while `IN_PROGRESS`. Returns `204`.",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"author\": \"Mecânico Chefe\",\n  \"content\": \"Diagnóstico concluído: substituição de filtro e óleo iniciada.\"\n}"
+              "raw": "{\n  \"text\": \"Diagnóstico concluído: substituição de filtro e óleo iniciada.\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/executions/{{executionId}}/notes",
@@ -103,6 +106,7 @@
           "name": "Complete Execution (Publishes ExecutionCompleted)",
           "request": {
             "method": "POST",
+            "description": "`IN_PROGRESS` → `COMPLETED`; the OS Service moves the service order to `COMPLETED`.",
             "url": {
               "raw": "{{baseUrl}}/api/executions/{{executionId}}/complete",
               "host": ["{{baseUrl}}"],
@@ -114,6 +118,7 @@
           "name": "Fail Execution (Publishes ExecutionFailed -> Saga Compensation)",
           "request": {
             "method": "POST",
+            "description": "`IN_PROGRESS` → `FAILED`; the OS Service cancels the service order, returns the parts to stock and sends `CancelBudget` so Billing refunds the payment.",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",

@@ -203,14 +203,33 @@ k8s/                                                     Namespace, Deployment, 
   [`mechanics-infra-k8s`](https://github.com/Torque-OS/mechanics-infra-k8s), F4-08/F4-09) —
   **requires** these repo secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (same IAM user as
   `mechanics-software`), `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `MONGO_CONNECTION_STRING`,
-  `RABBITMQ_CONNECTION_STRING`, `JWT_SECRET`. None of these are set yet, and the EKS cluster isn't currently
-  running — `deploy.yml` will fail at the `aws eks update-kubeconfig` step until both exist. The
-  pipeline is ready; the infrastructure to run it against isn't.
+  `RABBITMQ_CONNECTION_STRING`, `JWT_SECRET`. All of them are configured, and every merge to `main` has
+  deployed to the cluster since 2026-11-17.
 
 ## Testing & Coverage Evidence (F4-28)
 
 ```bash
 dotnet test --collect:"XPlat Code Coverage" --settings coverlet.runsettings
+```
+
+Domain, application, consumer and endpoint tests. Endpoint tests run the real HTTP pipeline (JWT, policies, error
+mapping) over EF InMemory, and the consumers run on the MassTransit test harness, so no PostgreSQL, MongoDB or broker
+is needed.
+
+**Coverage (F4-28)** — 99 tests, measured on 2026-11-17 on `main` with the command above:
+
+| Project | Lines | Branches |
+|---|---|---|
+| Api | 100% | 100% |
+| Application | 100% | 100% |
+| Domain | 86.4% | 61.5% |
+| Infrastructure | 100% | 66.7% |
+| **Total** | **95.6%** (195 / 204) | **63.2%** (24 / 38) |
+
+`ci.yml` fails the build below 80% line coverage and posts the same table on every pull request.
+
+**Manual testing (F4-40)** — import `MechanicsExecutionService.postman_collection.json` into Postman. The collection
+description explains where the token comes from and the order to run the requests in.
 
 ## Contributing
 
