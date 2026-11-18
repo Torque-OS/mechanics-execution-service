@@ -3,13 +3,11 @@ using MechanicsSoftware.ExecutionService.Domain.Exceptions;
 namespace MechanicsSoftware.ExecutionService.Domain.ValueObjects;
 
 /// <summary>
-/// Lifecycle of an item in the execution queue (ADR-011). Only <see cref="Status.Queued"/> is
-/// produced in this slice (F4-18, on the <c>EnqueueExecution</c> command); the remaining
-/// transitions are wired by later issues:
-/// <see cref="Status.InProgress"/>/diagnosis-and-repair updates (F4-19), publishing
-/// <c>ExecutionCompleted</c>/<c>ExecutionFailed</c> (F4-20), and the <c>Cancelled</c>
-/// compensation (F4-21). The full transition table is defined now so those issues only add
-/// behaviour, not domain shape.
+/// Lifecycle of an item in the execution queue (ADR-011). <see cref="Status.Queued"/> (F4-18) and
+/// <see cref="Status.InProgress"/> (F4-19, <c>ExecutionOrder.StartDiagnosis</c>) are produced
+/// today; publishing <c>ExecutionCompleted</c>/<c>ExecutionFailed</c> is F4-20, and the
+/// <c>Cancelled</c> compensation is F4-21. The full transition table was defined in F4-18 so
+/// those issues only add behaviour, not domain shape.
 /// </summary>
 public sealed class ExecutionStatus(ExecutionStatus.Status value) : ValueObject
 {

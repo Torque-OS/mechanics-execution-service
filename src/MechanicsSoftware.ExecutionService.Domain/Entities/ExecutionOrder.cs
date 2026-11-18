@@ -20,6 +20,9 @@ public sealed class ExecutionOrder : Entity<Guid>
     public int Priority { get; private set; }
 
     public DateTime QueuedAt { get; private set; }
+    public DateTime? StartedAt { get; private set; }
+    public DateTime? FinishedAt { get; private set; }
+    public string? FailureReason { get; private set; }
 
     private ExecutionOrder() { }
 
@@ -39,5 +42,42 @@ public sealed class ExecutionOrder : Entity<Guid>
             Status = ExecutionStatus.CreateQueued(),
             QueuedAt = DateTime.UtcNow
         };
+    }
+
+    /// <summary>Diagnosis/repair work begins; the order leaves the queue (F4-19).</summary>
+    public void StartDiagnosis()
+    {
+        Status = Status.TransitionTo(ExecutionStatus.Status.InProgress);
+        StartedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Repair finished successfully; publishes <c>ExecutionCompleted</c> (F4-20).</summary>
+    public void Complete()
+    {
+        Status = Status.TransitionTo(ExecutionStatus.Status.Completed);
+        FinishedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Repair could not be finished; publishes <c>ExecutionFailed</c> (F4-20) — triggers Saga compensation.</summary>
+    public void Fail(string reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new DomainException("Failure reason is required.");
+
+        Status = Status.TransitionTo(ExecutionStatus.Status.Failed);
+        FinishedAt = DateTime.UtcNow;
+        FailureReason = reason;
+    }
+
+    /// <summary>
+    /// Saga compensation (ADR-011, F4-21): the service order was cancelled because a later step
+    /// of the saga failed, so the queue entry or in-progress work is reverted. Valid from
+    /// <c>Queued</c> or <c>InProgress</c> — never from a terminal state (<c>Completed</c> can't
+    /// be un-done by this service; the saga wouldn't send this once execution already finished).
+    /// </summary>
+    public void Cancel()
+    {
+        Status = Status.TransitionTo(ExecutionStatus.Status.Cancelled);
+        FinishedAt = DateTime.UtcNow;
     }
 }

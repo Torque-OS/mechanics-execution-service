@@ -49,4 +49,131 @@ public class ExecutionOrderTests
         var act = () => ExecutionOrder.Create(Guid.NewGuid(), priority: -1);
         act.Should().Throw<DomainException>();
     }
+
+    [Fact]
+    public void StartDiagnosis_FromQueued_StatusIsInProgress()
+    {
+        var order = ExecutionOrder.Create(Guid.NewGuid());
+        order.StartDiagnosis();
+        order.Status.Value.Should().Be(ExecutionStatus.Status.InProgress);
+    }
+
+    [Fact]
+    public void StartDiagnosis_FromQueued_SetsStartedAt()
+    {
+        var order = ExecutionOrder.Create(Guid.NewGuid());
+        var before = DateTime.UtcNow;
+        order.StartDiagnosis();
+        order.StartedAt.Should().NotBeNull();
+        order.StartedAt.Should().BeOnOrAfter(before);
+    }
+
+    [Fact]
+    public void StartDiagnosis_AlreadyInProgress_Throws()
+    {
+        var order = ExecutionOrder.Create(Guid.NewGuid());
+        order.StartDiagnosis();
+        var act = () => order.StartDiagnosis();
+        act.Should().Throw<DomainException>();
+    }
+
+    private static ExecutionOrder InProgressOrder()
+    {
+        var order = ExecutionOrder.Create(Guid.NewGuid());
+        order.StartDiagnosis();
+        return order;
+    }
+
+    [Fact]
+    public void Complete_FromInProgress_StatusIsCompleted()
+    {
+        var order = InProgressOrder();
+        order.Complete();
+        order.Status.Value.Should().Be(ExecutionStatus.Status.Completed);
+    }
+
+    [Fact]
+    public void Complete_FromInProgress_SetsFinishedAt()
+    {
+        var order = InProgressOrder();
+        var before = DateTime.UtcNow;
+        order.Complete();
+        order.FinishedAt.Should().NotBeNull();
+        order.FinishedAt.Should().BeOnOrAfter(before);
+    }
+
+    [Fact]
+    public void Complete_StillQueued_Throws()
+    {
+        var order = ExecutionOrder.Create(Guid.NewGuid());
+        var act = () => order.Complete();
+        act.Should().Throw<DomainException>();
+    }
+
+    [Fact]
+    public void Fail_FromInProgress_StatusIsFailed()
+    {
+        var order = InProgressOrder();
+        order.Fail("Part unavailable");
+        order.Status.Value.Should().Be(ExecutionStatus.Status.Failed);
+    }
+
+    [Fact]
+    public void Fail_FromInProgress_SetsFailureReasonAndFinishedAt()
+    {
+        var order = InProgressOrder();
+        order.Fail("Part unavailable");
+        order.FailureReason.Should().Be("Part unavailable");
+        order.FinishedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Fail_EmptyReason_Throws()
+    {
+        var order = InProgressOrder();
+        var act = () => order.Fail("   ");
+        act.Should().Throw<DomainException>();
+    }
+
+    [Fact]
+    public void Fail_StillQueued_Throws()
+    {
+        var order = ExecutionOrder.Create(Guid.NewGuid());
+        var act = () => order.Fail("too early");
+        act.Should().Throw<DomainException>();
+    }
+
+    [Fact]
+    public void Cancel_FromQueued_StatusIsCancelled()
+    {
+        var order = ExecutionOrder.Create(Guid.NewGuid());
+        order.Cancel();
+        order.Status.Value.Should().Be(ExecutionStatus.Status.Cancelled);
+    }
+
+    [Fact]
+    public void Cancel_FromInProgress_StatusIsCancelled()
+    {
+        var order = InProgressOrder();
+        order.Cancel();
+        order.Status.Value.Should().Be(ExecutionStatus.Status.Cancelled);
+    }
+
+    [Fact]
+    public void Cancel_FromCompleted_Throws()
+    {
+        var order = InProgressOrder();
+        order.Complete();
+        var act = () => order.Cancel();
+        act.Should().Throw<DomainException>();
+    }
+
+    [Fact]
+    public void Cancel_AlreadyCancelled_Throws()
+    {
+        var order = ExecutionOrder.Create(Guid.NewGuid());
+        order.Cancel();
+        var act = () => order.Cancel();
+        act.Should().Throw<DomainException>();
+    }
 }
