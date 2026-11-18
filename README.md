@@ -207,6 +207,30 @@ k8s/                                                     Namespace, Deployment, 
   running — `deploy.yml` will fail at the `aws eks update-kubeconfig` step until both exist. The
   pipeline is ready; the infrastructure to run it against isn't.
 
+## Testing & Coverage Evidence
+
+```bash
+dotnet test --collect:"XPlat Code Coverage" --settings coverlet.runsettings
+```
+
+Domain, application, consumer and endpoint tests that run the real HTTP pipeline (JWT, staff policy,
+error mapping) over EF InMemory and in-memory queue/notes fakes — no PostgreSQL, MongoDB or broker needed.
+
+**Coverage (F4-28)** — 99 tests, measured on 2026-11-17 with the command above:
+
+| Project | Lines | Branches |
+|---|---|---|
+| Api | 100% | 100% |
+| Application | 100% | 100% |
+| Domain | 86.2% | 61.5% |
+| Infrastructure | 100% | 66.7% |
+| **Total** | **95.1%** | **63.1%** |
+
+`ci.yml` fails the build below 80% line coverage and posts the same table on every pull request.
+
+**Manual testing (F4-40)** — import `MechanicsExecutionService.postman_collection.json` into Postman. The collection
+description explains where the staff token comes from and the order to run the requests in.
+
 ## Contributing
 
 `main` is protected — open a PR from a branch and get one approval. Conventional commits.
